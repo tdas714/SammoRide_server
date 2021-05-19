@@ -3,13 +3,16 @@ package internalReg
 import (
 	"crypto/x509"
 	"encoding/pem"
+	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"sammoRide/ca"
+	"sammoRide/ut"
 )
 
 func RegisterRoot() {
-	_, rBlock, priv := ca.GenCARoot("India", "SammoRide", "127.0.0.1", int64(1))
+	_, rBlock, priv := ca.GenCARoot("India", "SammoRide", ut.GetIP(), int64(1))
 	_ = os.Mkdir("rootCerts", 0700)
 	certOut, err := os.Create("rootCerts/rootCa.crt")
 	if err != nil {
@@ -26,4 +29,15 @@ func RegisterRoot() {
 	pem.Encode(keyOut, &pem.Block{Type: "EC PRIVATE KEY", Bytes: privbyte})
 	keyOut.Close()
 	log.Print("written key.pem\n")
+
+	f, err := ioutil.ReadFile("rootCerts/rootCa.key")
+	if err != nil {
+		fmt.Println(err)
+	}
+	privateKey := ut.LoadPrivateKey(f)
+	fmt.Println(privateKey)
+	f, err = ioutil.ReadFile("rootCerts/rootCa.crt")
+	cert := ut.LoadCertificate(f)
+
+	RegisterInter(cert, privateKey, "India", fmt.Sprintf("sammoride.orderer.%d.com", 1), "West Bengal", ut.GetIP())
 }

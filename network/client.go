@@ -33,7 +33,7 @@ func createClientConfig(ca, crt, key string) (*tls.Config, error) {
 	}, nil
 }
 
-func sendData(addr, ca, crt, key string) {
+func SendData(addr, ca, crt, key string) {
 	// addr := *connect
 	if !strings.Contains(addr, ":") {
 		addr += ":443"
@@ -41,7 +41,7 @@ func sendData(addr, ca, crt, key string) {
 
 	config, err := createClientConfig(ca, crt, key)
 	if err != nil {
-		log.Fatal("config failed: %s", err.Error())
+		log.Panic("config failed: %s", err.Error())
 	}
 
 	conn, err := tls.Dial("tcp", addr, config)
