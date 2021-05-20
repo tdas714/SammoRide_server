@@ -19,7 +19,6 @@ const (
 )
 
 type PeerEnrollDataRequest struct {
-	Header   string
 	Country  string
 	Name     string
 	Province string

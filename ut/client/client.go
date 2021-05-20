@@ -1,34 +1,24 @@
 package client
 
 import (
-	"bufio"
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"net"
+	"log"
+	"net/http"
 	"sammoRide/ut"
 )
 
 func SendEnrollRequest(country, name, province string) {
-	var enrollRes *ut.PeerEnrollDataResponse
+	enrollRes := &ut.PeerEnrollDataRequest{Country: "India", Name: "Tapas", Province: "West Bengal", IpAddr: ut.GetIP()}
+	json_data, err := json.Marshal(enrollRes)
 
-	c, err := net.Dial("tcp", ut.GetIP()+":8080")
 	if err != nil {
-		fmt.Println(err)
-		return
+		log.Fatal(err)
 	}
-
-	reqEnrroll := ut.PeerEnrollDataRequest{Header: ut.ENROLL_REQ, Country: country, Name: name, Province: province,
-		IpAddr: ut.GetIP()}
-
-	b, err := json.Marshal(reqEnrroll)
-
-	fmt.Print(">> ")
-	text := string(b)
-	fmt.Fprintf(c, text+"\n")
-
-	message, err := bufio.NewReader(c).ReadBytes('\n')
+	// var enrollRes *ut.PeerEnrollDataResponse
+	path := fmt.Sprintf("http://localhost:8080/post")
+	resp, err := http.Post(path, "application/json", bytes.NewBuffer(json_data))
 	ut.CheckErr(err)
-	json.Unmarshal(message, &enrollRes)
-
-	fmt.Print("->: " + enrollRes.Header)
+	println(resp)
 }

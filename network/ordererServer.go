@@ -1,7 +1,6 @@
 package network
 
 import (
-	"bufio"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/binary"
@@ -11,8 +10,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"net/http"
 	"os"
-	"sammoRide/ca"
 	"sammoRide/ut"
 
 	"github.com/dgraph-io/badger/v3"
@@ -72,11 +71,11 @@ func StartOrederServer(ipAddr, caPath, crtPath, keyPath string) {
 }
 
 func StartEnrollServer(name string) {
-	var enrollReq *ut.PeerEnrollDataRequest
-	cert, err := ioutil.ReadFile(name + "/interCa.crt")
-	rcert, err := ioutil.ReadFile("rootCerts/rootCa.crt")
-	priv, err := ioutil.ReadFile(name + "/interCa.key")
-	ut.CheckErr(err)
+	// var enrollReq *ut.PeerEnrollDataRequest
+	// cert, err := ioutil.ReadFile(name + "/interCa.crt")
+	// rcert, err := ioutil.ReadFile("rootCerts/rootCa.crt")
+	// priv, err := ioutil.ReadFile(name + "/interCa.key")
+	// ut.CheckErr(err)
 
 	db, err := badger.Open(badger.DefaultOptions("database"))
 	if err != nil {
@@ -84,80 +83,65 @@ func StartEnrollServer(name string) {
 	}
 	defer db.Close()
 
-	b := make([]byte, 10)
+	b := make([]byte, 1024)
 	if _, err := os.Stat(ut.SERIAL_LOG); os.IsNotExist(err) {
 		binary.BigEndian.PutUint64(b, 0)
 		err = ioutil.WriteFile(ut.SERIAL_LOG, b, 0700)
 		ut.CheckErr(err)
 	}
 
-	serialNum, err := ioutil.ReadFile(ut.SERIAL_LOG)
+	// serialNum, err := ioutil.ReadFile(ut.SERIAL_LOG)
 	ut.CheckErr(err)
+	path := "/post"
+	http.HandleFunc(path, func(rw http.ResponseWriter, r *http.Request) {
+		// handleRequest(enrollReq, cert, priv, rcert, serialNum, db, w, r)
+		var res *ut.PeerEnrollDataRequest
 
-	l, err := net.Listen("tcp", ut.GetIP()+":8080")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer l.Close()
+		json.NewDecoder(r.Body).Decode(&res)
+		fmt.Println(res.Name)
+	})
+	http.ListenAndServe("localhost:8080", nil)
 
-	cServer, err := l.Accept()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
+}
 
-	for {
-		netData, err := bufio.NewReader(cServer).ReadBytes('\n')
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		//  ca.GenServerCert(dcaCert, dcaKey, ipAddr, country, name, province, "peer", int64(1))
-		fmt.Print("-> ", string(netData))
-		err = json.Unmarshal(netData, &enrollReq)
-		ut.CheckErr(err)
+func handleRequest(enrollReq *ut.PeerEnrollDataRequest, cert, priv, rcert, serialNum []byte,
+	db *badger.DB, r *http.Request, rw http.ResponseWriter) {
+	// enrollReq = r.Body.
+	// _, pBlock, pPriv := ca.GenServerCert(ut.LoadCertificate(cert),
+	// 	ut.LoadPrivateKey(priv),
+	// 	enrollReq.IpAddr,
+	// 	enrollReq.Country,
+	// 	enrollReq.Name,
+	// 	enrollReq.Province,
+	// 	"Peer",
+	// 	int64(binary.BigEndian.Uint64(serialNum)+1))
 
-		fmt.Println(enrollReq)
-		if enrollReq.Header == ut.ENROLL_REQ {
-			fmt.Println("Activted")
-			go func(cServer net.Conn) {
-				_, pBlock, pPriv := ca.GenServerCert(ut.LoadCertificate(cert),
-					ut.LoadPrivateKey(priv),
-					enrollReq.IpAddr,
-					enrollReq.Country,
-					enrollReq.Name,
-					enrollReq.Province,
-					"Peer",
-					int64(binary.BigEndian.Uint64(serialNum)+1))
+	// enrollRes := ut.PeerEnrollDataResponse{Header: ut.ENROLL_RES,
+	// 	IpAddr:        enrollReq.IpAddr,
+	// 	PeerCertBlock: *pBlock,
+	// 	PrivateKey:    *pPriv,
+	// 	SenderCert:    *ut.LoadCertificate(cert),
+	// 	RootCert:      *ut.LoadCertificate(rcert)}
 
-				enrollRes := ut.PeerEnrollDataResponse{Header: ut.ENROLL_RES,
-					IpAddr:        enrollReq.IpAddr,
-					PeerCertBlock: *pBlock,
-					PrivateKey:    *pPriv,
-					SenderCert:    *ut.LoadCertificate(cert),
-					RootCert:      *ut.LoadCertificate(rcert)}
+	// // j, err := json.Marshal(enrollRes)
+	// if err != nil {
+	// 	return
+	// }
+	// t := time.Now()
+	// myTime := t.Format(time.RFC3339) + "\n"
+	// cServer.Write([]byte(myTime))
+	// fmt.Println(enrollReq)
 
-				j, err := json.Marshal(enrollRes)
-				if err != nil {
-					return
-				}
-				// t := time.Now()
-				// myTime := t.Format(time.RFC3339) + "\n"
-				// cServer.Write([]byte(myTime))
-				// fmt.Println(enrollReq)
+	//
+	// b := make([]byte, 1024)
+	// cServer.Write(append(j, byte('\n')))
+	// err = db.Update(func(txn *badger.Txn) error {
+	// 	binary.BigEndian.PutUint64(b, binary.BigEndian.Uint64(serialNum)+1)
+	// 	interByte, e := ut.GetBytes(enrollReq)
+	// 	txn.Set([]byte(b), interByte)
+	// 	ut.CheckErr(e)
+	// 	return nil
+	// })
+	// ut.CheckErr(err)
 
-				//
-				cServer.Write(append(j, []byte("\n")...))
-				err = db.Update(func(txn *badger.Txn) error {
-					binary.BigEndian.PutUint64(b, binary.BigEndian.Uint64(serialNum)+1)
-					interByte, e := ut.GetBytes(enrollReq)
-					txn.Set([]byte(b), interByte)
-					ut.CheckErr(e)
-					return nil
-				})
-				ut.CheckErr(err)
-			}(cServer)
-		}
-	}
 }
