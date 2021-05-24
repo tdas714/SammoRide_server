@@ -11,19 +11,22 @@ func main() {
 	fmt.Println("This is a test")
 	mode := flag.String("mode", "Mode", "Mode of the application")
 	flag.Parse()
-	// _, rootCertPEM, _ := ca.GenCARoot("India", "SammoRide", "127.0.0.1")
-	// fmt.Println("rootCert\n", string(rootCertPEM))
 
-	// ip := ut.GetIP()
-	// internalReg.RegisterInter(tls.LoadX509KeyPair("rootCerts/rootCa.crt", "rootCerts/rootCa.key"), , "India", "sammoRide-First", "West Bengal", ip)
-	// network.StartOrederServer("127.0.0.1:2000", "rootCerts/rootCa.crt", "interCerts/sammoride/orderer/1/com/interCa.crt", "interCerts/sammoride/orderer/1/com/interCa.key")
-	// register.RegisterPeer("china", "DasRam", "xijing", "127.0.0.1", "interCerts/sammoride/orderer/1/com/interCa.crt", "interCerts/sammoride/orderer/1/com/interCa.key")
-	// =======================Cilent
-	// fmt.Print(*mode)
+	fmt.Print(*mode)
+	// cert, err := ioutil.ReadFile("rootCerts/rootCa.crt")
+	// key, err := ioutil.ReadFile("rootCerts/rootCa.key")
+	// ut.CheckErr(err, "main")
+
+	// internalReg.RegisterInter(ut.LoadCertificate(cert), ut.LoadPrivateKey(key), "India", "orderer", "west", "127.0.0.1", "kolkata", "100025")
+
 	if *mode == "s" {
-		network.StartEnrollServer("interCerts/sammoride/orderer/1/com")
+		go network.StartEnrollServer("interCerts/orderer")
+		network.StartOrederServer("localhost", "rootCerts/rootCa.crt",
+			"interCerts/orderer/interCa.crt",
+			"interCerts/orderer/interCa.key")
 	} else {
-		client.SendEnrollRequest("India", "Tapas.Das", "west Bengal")
+		// client.SendEnrollRequest("India", "Tapas.Das", "west Bengal", "kolkata", "700028")
+		client.SendData("rootCerts/rootCa.crt", "PeerCerts/Cert.crt", "PeerCerts/Cert.key")
 	}
 
 }

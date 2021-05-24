@@ -19,19 +19,21 @@ const (
 )
 
 type PeerEnrollDataRequest struct {
-	Country  string
-	Name     string
-	Province string
-	IpAddr   string
+	Country    string
+	Name       string
+	Province   string
+	IpAddr     string
+	City       string
+	PostalCode string
 }
 
 type PeerEnrollDataResponse struct {
-	Header        string
-	IpAddr        string
-	PeerCertBlock pem.Block
-	PrivateKey    ecdsa.PrivateKey
-	SenderCert    x509.Certificate
-	RootCert      x509.Certificate
+	Header     string
+	IpAddr     string
+	PeerCert   []byte
+	PrivateKey []byte
+	SenderCert []byte
+	RootCert   []byte
 }
 
 func GetIP() string {
@@ -67,9 +69,9 @@ func LoadCertificate(f []byte) *x509.Certificate {
 	return cert
 }
 
-func CheckErr(err error) {
+func CheckErr(err error, origin string) {
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("%s - %s", origin, err)
 	}
 }
 

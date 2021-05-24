@@ -6,36 +6,39 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/pem"
 	"math/big"
-	"net"
+	"sammoRide/ut"
 	"time"
 )
 
-func GenCARoot(country, orgName, ipAddr string, serNum int64) (*x509.Certificate, *pem.Block, *ecdsa.PrivateKey) {
+func GenCARoot() ([]byte, *ecdsa.PrivateKey) {
 	// if _, err := os.Stat("someFile"); err == nil {
 	// 	//read PEM and cert from file
 	// }
-	var rootTemplate = x509.Certificate{
-		SerialNumber: big.NewInt(serNum),
+	ca := &x509.Certificate{
+		SerialNumber: big.NewInt(1653),
 		Subject: pkix.Name{
-			Country:      []string{country},
-			Organization: []string{orgName},
-			CommonName:   "Sammo Ride Root CA",
+			Organization:  []string{"Sammo, Sammo-Ride INC."},
+			Country:       []string{"India"},
+			Province:      []string{"West Bengal"},
+			Locality:      []string{"Kolkata"},
+			StreetAddress: []string{""},
+			PostalCode:    []string{""},
 		},
-		NotBefore:             time.Now().Add(-10 * time.Second),
+		NotBefore:             time.Now(),
 		NotAfter:              time.Now().AddDate(25, 0, 0),
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
 		IsCA:                  true,
-		MaxPathLen:            2,
-		IPAddresses:           []net.IP{net.ParseIP(ipAddr)},
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
+		// IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
 	}
+
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		panic(err)
-	}
-	rootCert, rootBlock := genCert(&rootTemplate, &rootTemplate, &priv.PublicKey, priv)
-	return rootCert, rootBlock, priv
+	ut.CheckErr(err, "GenCARoot/priv")
+
+	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, &priv.PublicKey, priv)
+	ut.CheckErr(err, "GenCARoot/caBytes")
+
+	return caBytes, priv
 }

@@ -1,17 +1,18 @@
 package network
 
 import (
+	"crypto/sha1"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
-	"fmt"
+	"encoding/pem"
 	"io"
 	"io/ioutil"
 	"log"
-	"net"
 	"net/http"
 	"os"
+	"sammoRide/ca"
 	"sammoRide/ut"
 
 	"github.com/dgraph-io/badger/v3"
@@ -19,63 +20,61 @@ import (
 
 func createOrdererServerConfig(caPath, crtPath, keyPath string) (*tls.Config, error) {
 	caCertPEM, err := ioutil.ReadFile(caPath)
-	if err != nil {
-		return nil, err
-	}
+	ut.CheckErr(err, "createOrderconfig/caPem")
+	CertPem, err := ioutil.ReadFile(crtPath)
+	ut.CheckErr(err, "createOrdererConfig/certpem")
 
-	roots := x509.NewCertPool()
+	roots, err := x509.SystemCertPool()
+	ut.CheckErr(err, "create Order Config/roots")
 	ok := roots.AppendCertsFromPEM(caCertPEM)
 	if !ok {
 		panic("failed to parse root certificate")
 	}
+	ok = roots.AppendCertsFromPEM(CertPem)
+	ut.CheckErr(err, "createOrdererConfig/CertsPemAppend")
 
 	cert, err := tls.LoadX509KeyPair(crtPath, keyPath)
 	if err != nil {
 		return nil, err
 	}
-	return &tls.Config{
+	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{cert},
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 		ClientCAs:    roots,
-	}, nil
+	}
+	tlsConfig.BuildNameToCertificate()
+	return tlsConfig, nil
+}
+
+func helloHandler(w http.ResponseWriter, r *http.Request) {
+	// Write "Hello, world!" to the response body
+	io.WriteString(w, "Hello, world!\n")
 }
 
 func StartOrederServer(ipAddr, caPath, crtPath, keyPath string) {
-	config, err := createOrdererServerConfig(caPath, crtPath, keyPath)
-	if err != nil {
-		log.Fatal("config failed: %s", err.Error())
+
+	// Set up a /hello resource handler
+	http.HandleFunc("/hello", helloHandler)
+
+	tlsConfig, err := createOrdererServerConfig(caPath, crtPath, keyPath)
+	ut.CheckErr(err, "StartOrederServer/config")
+
+	// Create a Server instance to listen on port 8443 with the TLS config
+	server := &http.Server{
+		Addr:      ipAddr + ":8443",
+		TLSConfig: tlsConfig,
 	}
 
-	ln, err := tls.Listen("tcp", ipAddr, config)
-	if err != nil {
-		log.Fatal("listen failed: %s", err.Error())
-	}
-
-	log.Printf("listen on %s", ipAddr)
-
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			log.Fatal("accept failed: %s", err.Error())
-			break
-		}
-		log.Printf("connection open: %s", conn.RemoteAddr())
-		// printConnState(conn.(*tls.Conn))
-
-		go func(c net.Conn) {
-			wr, _ := io.Copy(c, c)
-			c.Close()
-			log.Printf("connection close: %s, written: %d", conn.RemoteAddr(), wr)
-		}(conn)
-	}
+	// Listen to HTTPS connections with the server certificate and wait
+	log.Fatal(server.ListenAndServeTLS(crtPath, keyPath))
 }
 
 func StartEnrollServer(name string) {
 	// var enrollReq *ut.PeerEnrollDataRequest
-	// cert, err := ioutil.ReadFile(name + "/interCa.crt")
-	// rcert, err := ioutil.ReadFile("rootCerts/rootCa.crt")
-	// priv, err := ioutil.ReadFile(name + "/interCa.key")
-	// ut.CheckErr(err)
+	cert, err := ioutil.ReadFile(name + "/interCa.crt")
+	rcert, err := ioutil.ReadFile("rootCerts/rootCa.crt")
+	priv, err := ioutil.ReadFile(name + "/interCa.key")
+	ut.CheckErr(err, "StartEnrollServer")
 
 	db, err := badger.Open(badger.DefaultOptions("database"))
 	if err != nil {
@@ -87,61 +86,67 @@ func StartEnrollServer(name string) {
 	if _, err := os.Stat(ut.SERIAL_LOG); os.IsNotExist(err) {
 		binary.BigEndian.PutUint64(b, 0)
 		err = ioutil.WriteFile(ut.SERIAL_LOG, b, 0700)
-		ut.CheckErr(err)
+		ut.CheckErr(err, "StartEnrollServer")
 	}
 
-	// serialNum, err := ioutil.ReadFile(ut.SERIAL_LOG)
-	ut.CheckErr(err)
+	serialNum, err := ioutil.ReadFile(ut.SERIAL_LOG)
+	ut.CheckErr(err, "StartEnrollServer")
 	path := "/post"
 	http.HandleFunc(path, func(rw http.ResponseWriter, r *http.Request) {
-		// handleRequest(enrollReq, cert, priv, rcert, serialNum, db, w, r)
 		var res *ut.PeerEnrollDataRequest
 
 		json.NewDecoder(r.Body).Decode(&res)
-		fmt.Println(res.Name)
+		handleRequest(res, cert, priv, rcert, serialNum, db, rw)
 	})
 	http.ListenAndServe("localhost:8080", nil)
 
 }
 
 func handleRequest(enrollReq *ut.PeerEnrollDataRequest, cert, priv, rcert, serialNum []byte,
-	db *badger.DB, r *http.Request, rw http.ResponseWriter) {
-	// enrollReq = r.Body.
-	// _, pBlock, pPriv := ca.GenServerCert(ut.LoadCertificate(cert),
-	// 	ut.LoadPrivateKey(priv),
-	// 	enrollReq.IpAddr,
-	// 	enrollReq.Country,
-	// 	enrollReq.Name,
-	// 	enrollReq.Province,
-	// 	"Peer",
-	// 	int64(binary.BigEndian.Uint64(serialNum)+1))
+	db *badger.DB, rw http.ResponseWriter) {
 
-	// enrollRes := ut.PeerEnrollDataResponse{Header: ut.ENROLL_RES,
-	// 	IpAddr:        enrollReq.IpAddr,
-	// 	PeerCertBlock: *pBlock,
-	// 	PrivateKey:    *pPriv,
-	// 	SenderCert:    *ut.LoadCertificate(cert),
-	// 	RootCert:      *ut.LoadCertificate(rcert)}
+	sha := sha1.New()
+	js, err := json.Marshal(enrollReq)
+	ut.CheckErr(err, "handleRequest/js")
+	sha.Write(js)
 
-	// // j, err := json.Marshal(enrollRes)
-	// if err != nil {
-	// 	return
-	// }
-	// t := time.Now()
-	// myTime := t.Format(time.RFC3339) + "\n"
-	// cServer.Write([]byte(myTime))
-	// fmt.Println(enrollReq)
+	pCert, pPriv := ca.GenServerCert(ut.LoadCertificate(cert),
+		ut.LoadPrivateKey(priv),
+		enrollReq.IpAddr,
+		enrollReq.Country,
+		enrollReq.Name,
+		enrollReq.Province,
+		"Peer",
+		enrollReq.City,
+		enrollReq.PostalCode,
+		int64(binary.BigEndian.Uint64(serialNum)+1),
+		sha.Sum(nil),
+	)
+
+	pPrivByte, err := x509.MarshalECPrivateKey(pPriv)
+	ut.CheckErr(err, "handleReq/pPriveByte")
+
+	pCertPem := pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: pCert,
+	})
+
+	_ = ut.LoadCertificate(pCertPem)
+
+	enrollRes := ut.PeerEnrollDataResponse{Header: ut.ENROLL_RES,
+		IpAddr:     enrollReq.IpAddr,
+		PeerCert:   pCertPem,
+		PrivateKey: pPrivByte,
+		SenderCert: cert,
+		RootCert:   rcert}
 
 	//
-	// b := make([]byte, 1024)
-	// cServer.Write(append(j, byte('\n')))
-	// err = db.Update(func(txn *badger.Txn) error {
-	// 	binary.BigEndian.PutUint64(b, binary.BigEndian.Uint64(serialNum)+1)
-	// 	interByte, e := ut.GetBytes(enrollReq)
-	// 	txn.Set([]byte(b), interByte)
-	// 	ut.CheckErr(e)
-	// 	return nil
-	// })
-	// ut.CheckErr(err)
-
+	js, err = json.Marshal(enrollRes)
+	// fmt.Println(string(js))
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	rw.Header().Set("Content-Type", "application/json")
+	rw.Write(js)
 }

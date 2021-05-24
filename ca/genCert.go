@@ -6,9 +6,11 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/pem"
 	"math/big"
 	"net"
+	"sammoRide/ut"
 	"time"
 )
 
@@ -29,31 +31,41 @@ func genCert(template, parent *x509.Certificate, publicKey *ecdsa.PublicKey, pri
 	return cert, &b
 }
 
-func GenServerCert(DCACert *x509.Certificate, DCAKey *ecdsa.PrivateKey, ipAddr, country, orgName, province, orgUnit string, serNum int64) (*x509.Certificate, *pem.Block, *ecdsa.PrivateKey) {
-	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		panic(err)
-	}
+func GenServerCert(DCACert *x509.Certificate, DCAKey *ecdsa.PrivateKey, ipAddr, country, orgName, province, orgUnit, city, postalCode string, serNum int64, subKeyId []byte) ([]byte, *ecdsa.PrivateKey) {
 
-	var ServerTemplate = x509.Certificate{
+	// Prepare certificate
+	cert := &x509.Certificate{
 		SerialNumber: big.NewInt(serNum),
 		Subject: pkix.Name{
-			Country:            []string{country},
 			Organization:       []string{orgName},
+			Country:            []string{country},
 			Province:           []string{province},
+			Locality:           []string{city},
+			StreetAddress:      []string{""},
+			PostalCode:         []string{postalCode},
 			OrganizationalUnit: []string{orgUnit},
-			CommonName:         "Peers",
+			CommonName:         "IP:" + ut.GetIP(),
 		},
-		NotBefore:      time.Now().Add(-10 * time.Second),
-		NotAfter:       time.Now().AddDate(10, 0, 0),
-		KeyUsage:       x509.KeyUsageCRLSign,
-		ExtKeyUsage:    []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		IsCA:           false,
-		MaxPathLenZero: true,
-		IPAddresses:    []net.IP{net.ParseIP(ipAddr)},
+		NotBefore:    time.Now(),
+		NotAfter:     time.Now().AddDate(10, 0, 0),
+		SubjectKeyId: subKeyId,
+		ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:     x509.KeyUsageDigitalSignature,
+		IPAddresses:  []net.IP{net.ParseIP(ipAddr)},
 	}
 
-	ServerCert, ServerBlock := genCert(&ServerTemplate, DCACert, &priv.PublicKey, DCAKey)
-	return ServerCert, ServerBlock, priv
+	extSubjectAltName := pkix.Extension{}
+	extSubjectAltName.Id = asn1.ObjectIdentifier{2, 5, 29, 17}
+	extSubjectAltName.Critical = true
+	extSubjectAltName.Value = []byte(`IP:` + ut.GetIP())
+	cert.ExtraExtensions = []pkix.Extension{extSubjectAltName}
+
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	ut.CheckErr(err, "GenServerCert/privebyte")
+
+	serverCert, err := x509.CreateCertificate(rand.Reader, cert, DCACert, &priv.PublicKey, DCAKey)
+	ut.CheckErr(err, "GenServerCert/serverCert")
+
+	return serverCert, priv
 
 }

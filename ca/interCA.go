@@ -6,37 +6,45 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/pem"
 	"math/big"
 	"net"
 	"time"
 )
 
-func GenDCA(RootCert *x509.Certificate, RootKey *ecdsa.PrivateKey, country, orgName, ipAddr, province string, serNum int64) (*x509.Certificate, *pem.Block, *ecdsa.PrivateKey) {
+func GenDCA(rootCa *x509.Certificate, rootKey *ecdsa.PrivateKey, country, orgName, ipAddr, province, city, postalCode string, serNum int64, subKeyId []byte) ([]byte, *ecdsa.PrivateKey) {
+
+	cert := &x509.Certificate{
+		SerialNumber: big.NewInt(serNum),
+		Subject: pkix.Name{
+			Organization:  []string{orgName},
+			Country:       []string{country},
+			Province:      []string{province},
+			Locality:      []string{city},
+			StreetAddress: []string{""},
+			PostalCode:    []string{postalCode},
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              time.Now().AddDate(25, 0, 0),
+		IsCA:                  true,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,
+		BasicConstraintsValid: true,
+		IPAddresses:           []net.IP{net.ParseIP(ipAddr)},
+		SubjectKeyId:          subKeyId,
+	}
+
+	// extSubjectAltName := pkix.Extension{}
+	// extSubjectAltName.Id = asn1.ObjectIdentifier{2, 5, 29, 17}
+	// extSubjectAltName.Critical = true
+	// extSubjectAltName.Value = []byte(`IP:` + ipAddr)
+	// cert.ExtraExtensions = []pkix.Extension{extSubjectAltName}
+
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		panic(err)
 	}
 
-	var DCATemplate = x509.Certificate{
-		SerialNumber: big.NewInt(serNum),
-		Subject: pkix.Name{
-			Country:            []string{country},
-			Organization:       []string{orgName},
-			Province:           []string{province},
-			OrganizationalUnit: []string{"intermediate"},
-			CommonName:         "DCA",
-		},
-		NotBefore:             time.Now().Add(-10 * time.Second),
-		NotAfter:              time.Now().AddDate(25, 0, 0),
-		KeyUsage:              x509.KeyUsageCertSign | x509.KeyUsageCRLSign,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
-		BasicConstraintsValid: true,
-		IsCA:                  true,
-		MaxPathLenZero:        false,
-		MaxPathLen:            1,
-		IPAddresses:           []net.IP{net.ParseIP(ipAddr)},
-	}
-	DCACert, DCABlock := genCert(&DCATemplate, RootCert, &priv.PublicKey, RootKey)
-	return DCACert, DCABlock, priv
+	ordererCaBytes, err := x509.CreateCertificate(rand.Reader, cert, rootCa, &priv.PublicKey, rootKey)
+
+	return ordererCaBytes, priv
 }
