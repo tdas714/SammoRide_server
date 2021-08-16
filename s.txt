@@ -2,3 +2,12 @@ setup functions to enroll intermediates
 setup functions to enroll peer
 tset tls hadshake and data transfer
 
+first Rider Anounces it's availability
+Second Interested travaler Request for Signed Contract
+third Traveler signes the response sends it to orderer service
+Orderer Service verify the Contract signatures , sends that to the endorcing peers
+Endorsing peer runs the Chain-Code based on the Contract
+Sends that to orderer service
+orderer service verify the trasaction, includes that to blockchain
+than orderer service updates the world-state
+Distributes those to other peers

@@ -18,15 +18,13 @@ func GenCARoot() ([]byte, *ecdsa.PrivateKey) {
 	ca := &x509.Certificate{
 		SerialNumber: big.NewInt(1653),
 		Subject: pkix.Name{
-			Organization:  []string{"Sammo, Sammo-Ride INC."},
+			Organization:  []string{"Sammo Ride pvt. ltd."},
 			Country:       []string{"India"},
-			Province:      []string{"West Bengal"},
-			Locality:      []string{"Kolkata"},
 			StreetAddress: []string{""},
-			PostalCode:    []string{""},
+			PostalCode:    []string{"700028"},
 		},
 		NotBefore:             time.Now(),
-		NotAfter:              time.Now().AddDate(25, 0, 0),
+		NotAfter:              time.Now().AddDate(1000, 0, 0),
 		IsCA:                  true,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,

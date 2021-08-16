@@ -11,7 +11,19 @@ import (
 	"time"
 )
 
-func GenDCA(rootCa *x509.Certificate, rootKey *ecdsa.PrivateKey, country, orgName, ipAddr, province, city, postalCode string, serNum int64, subKeyId []byte) ([]byte, *ecdsa.PrivateKey) {
+func GenDCA(mode string, rootCa *x509.Certificate, rootKey *ecdsa.PrivateKey, country, orgName, ipAddr, province, city, postalCode string, serNum int64, subKeyId []byte) ([]byte, *ecdsa.PrivateKey) {
+	var notAfter time.Time
+
+	if mode != "Orderer" {
+		country = ""
+		province = ""
+		city = ""
+		postalCode = ""
+		ipAddr = "127.0.0.1"
+		notAfter = time.Now().AddDate(1000, 0, 0)
+	} else {
+		notAfter = time.Now().AddDate(10, 0, 0)
+	}
 
 	cert := &x509.Certificate{
 		SerialNumber: big.NewInt(serNum),
@@ -22,9 +34,10 @@ func GenDCA(rootCa *x509.Certificate, rootKey *ecdsa.PrivateKey, country, orgNam
 			Locality:      []string{city},
 			StreetAddress: []string{""},
 			PostalCode:    []string{postalCode},
+			CommonName:    "Orderer",
 		},
-		NotBefore:             time.Now(),
-		NotAfter:              time.Now().AddDate(25, 0, 0),
+		NotBefore:             time.Now().AddDate(0, 0, -1),
+		NotAfter:              notAfter,
 		IsCA:                  true,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign,

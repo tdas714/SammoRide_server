@@ -1,6 +1,7 @@
 package internalReg
 
 import (
+	"crypto/ecdsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
@@ -11,10 +12,11 @@ import (
 	"sammoRide/ut"
 )
 
-func RegisterRoot() {
+func RegisterRoot(mode string) (*x509.Certificate, *ecdsa.PrivateKey, []byte) {
+	certfilepath := fmt.Sprintf("%sCerts/%sCa.crt", mode, mode)
 	caBytes, priv := ca.GenCARoot()
-	_ = os.Mkdir("rootCerts", 0600)
-	certOut, err := os.Create("rootCerts/rootCa.crt")
+	_ = os.Mkdir(fmt.Sprintf("%sCerts", mode), 0700)
+	certOut, err := os.Create(certfilepath)
 	ut.CheckErr(err, "RegisterRoot/certout")
 
 	//Public Key
@@ -25,23 +27,28 @@ func RegisterRoot() {
 	certOut.Close()
 	log.Print("written cert.pem\n")
 
+	privfilepath := fmt.Sprintf("%sCerts/%sCa.key", mode, mode)
+
 	// Private key
-	keyOut, err := os.OpenFile("rootCerts/rootCa.key", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	keyOut, err := os.OpenFile(privfilepath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
 	privbyte, err := x509.MarshalECPrivateKey(priv)
 	pem.Encode(keyOut, &pem.Block{Type: "EC PRIVATE KEY", Bytes: privbyte})
 	keyOut.Close()
 	log.Print("written key.pem\n")
 
-	// Load CA
-	catls, err := tls.LoadX509KeyPair("rootCerts/rootCa.crt", "rootCerts/rootCa.key")
+	// // Load CA
+	catls, err := tls.LoadX509KeyPair(certfilepath, privfilepath)
 	ut.CheckErr(err, "RegisterRoot/catls")
 	ca, err := x509.ParseCertificate(catls.Certificate[0])
 	ut.CheckErr(err, "RegisterRoot/ca")
 
-	pPem, err := os.ReadFile("rootCerts/rootCa.key")
+	pPem, err := os.ReadFile(privfilepath)
 	ut.CheckErr(err, "REgisterRoot/pPem")
 	p := ut.LoadPrivateKey(pPem)
 
-	RegisterInter(ca, p, "India", fmt.Sprintf("sammoride.orderer.%d.com", 1), "West Bengal", ut.GetIP(), "kolkata", "700028")
-
+	// RegisterInter(ca, p, "India", fmt.Sprintf("sammoride.orderer.%d.com", 1), "West Bengal", ut.GetIP(), "kolkata", "700028")
+	return ca, p, pem.EncodeToMemory(&pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: caBytes,
+	})
 }

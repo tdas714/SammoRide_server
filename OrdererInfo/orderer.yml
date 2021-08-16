@@ -1,0 +1,17 @@
+Info:
+  Country: "India"
+  Name : "Orderer1"
+  Province: "WestBengal"
+  City : "Kolkata"
+  IP : "202.142.113.190"
+  Port: ":8443"
+  PostalCode: "700028"
+
+Path:
+  CertificatePath: "OrdererCerts/OrdererCa.crt"
+  KeyPath: "OrdererCerts/OrdererCa.key"
+  CAsPath: "CAs"
+  PeerDBPath: "Database/peerlist"
+  OrdererFileDB: "Database/OrdererList"
+  ChainDB: "Database/Chain"
+  StatePath: "Database/State"

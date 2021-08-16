@@ -4,11 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"sammoRide/network"
-	"sammoRide/ut/client"
 )
 
 func main() {
-	fmt.Println("This is a test")
+	fmt.Println("generationg CAs")
 	mode := flag.String("mode", "Mode", "Mode of the application")
 	flag.Parse()
 
@@ -19,14 +18,21 @@ func main() {
 
 	// internalReg.RegisterInter(ut.LoadCertificate(cert), ut.LoadPrivateKey(key), "India", "orderer", "west", "127.0.0.1", "kolkata", "100025")
 
-	if *mode == "s" {
-		go network.StartEnrollServer("interCerts/orderer")
-		network.StartOrederServer("localhost", "rootCerts/rootCa.crt",
-			"interCerts/orderer/interCa.crt",
-			"interCerts/orderer/interCa.key")
-	} else {
-		// client.SendEnrollRequest("India", "Tapas.Das", "west Bengal", "kolkata", "700028")
-		client.SendData("rootCerts/rootCa.crt", "PeerCerts/Cert.crt", "PeerCerts/Cert.key")
-	}
+	// go network.StartEnrollServer("interCerts/orderer")
+	// network.StartOrederServer("127.0.0.1", "rootCerts/rootCa.crt",
+	// 	"interCerts/orderer/interCa.crt",
+	// 	"interCerts/orderer/interCa.key")
+
+	// rootca, rootP, _ := internalReg.RegisterRoot("Presidential")
+	// secCa, secP, _ := internalReg.RegisterInter(rootca, rootP, "India", "sammoride", "", "", "", "", "Secretary")
+	// ut.VerifyOrderer(rootca, secCa)
+	// direcCa, direcP, _ := internalReg.RegisterInter(secCa, secP, "India", "sammoride", "westbengal", "", "kolkata", "700028", "Director")
+	// ut.VerifyOrderer(secCa, direcCa)
+	// ut.VerifyPeer(rootca, secCa, direcCa)
+	// ordererca, _, _ := internalReg.RegisterInter(direcCa, direcP, "India", "sammoride", "west bengal", ut.GetIP(), "kolkata", "700028", "Orderer")
+	// ut.VerifyOrderer(direcCa, ordererca)
+	// ut.VerifyPeer(secCa, direcCa, ordererca)
+	// network.InitFileStructure("OrdererInfo/orderer.yml")
+	network.StartService("OrdererInfo/orderer.yml", true)
 
 }
